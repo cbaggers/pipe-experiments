@@ -4,6 +4,41 @@
 
 ;;----------------------------------------------------------------------
 
+(defmacro => (&body forms)
+  (labels ((=>expander (forms index)  
+             (if forms
+                 (let ((stage-name (symb '^ index)))
+                   `(let* ((^ ,(first forms))
+                           (,stage-name ^))
+                      (declare (ignorable ^ ,stage-name))
+                      ,(^>expander (rest forms) (1+ index))))
+                 '^)))
+    (=>expander forms 0)))
+
+(print (=> (* 1 2)
+           (* ^ ^ ^)
+           (/ ^ ^0)))
+
+;;----------------------------------------------------------------------
+
+(defmacro dmap (bindings expression &body body)
+  "(d-map ((x) y z) '((1 2 3) (4 5 6) (7 8 9))
+    (print x)
+    (print y)
+    (print z))"
+  (let* ((appends (mapcar #'listp bindings))
+         (bindings (mapcar (lambda (b) (if (listp b) (first b) b))
+                           (break "" bindings)))
+         (syms (mapcar (lambda (x) (gensym (symbol-name x))) bindings)))
+    `(destructuring-bind ,bindings
+         (loop :for ,syms :in ,expression 
+            ,@(mapcan (lambda (b s a) `(,(if a :append :collect) ,s :into ,b)) 
+                      bindings syms appends)
+            :finally (return ,(cons 'list bindings)))
+       ,@body)))
+
+;;----------------------------------------------------------------------
+
 (defmacro /> (&body forms)
   (labels ((_ (list) 
              (when list
